@@ -55,9 +55,11 @@ type SchemaRegistryClient struct {
 	schemaRegistryURL        string
 	credentials              *credentials
 	httpClient               *http.Client
+	httpHeader               http.Header
 	cachingEnabled           bool
 	cachingEnabledLock       sync.RWMutex
 	codecCreationEnabled     bool
+	codecAsFullJson          bool
 	codecCreationEnabledLock sync.RWMutex
 	idSchemaCache            map[int]*Schema
 	idSchemaCacheLock        sync.RWMutex
@@ -187,6 +189,7 @@ func CreateSchemaRegistryClientWithOptions(schemaRegistryURL string, client *htt
 	return &SchemaRegistryClient{
 		schemaRegistryURL:    schemaRegistryURL,
 		httpClient:           client,
+		httpHeader:           make(http.Header),
 		cachingEnabled:       true,
 		codecCreationEnabled: false,
 		idSchemaCache:        make(map[int]*Schema),
@@ -231,7 +234,7 @@ func (client *SchemaRegistryClient) GetSchema(schemaID int) (*Schema, error) {
 	}
 	var codec *goavro.Codec
 	if client.getCodecCreationEnabled() {
-		codec, err = goavro.NewCodec(schemaResp.Schema)
+		codec, err = client.getCodecForSchema(schemaResp.Schema)
 		if err != nil {
 			return nil, err
 		}
@@ -461,7 +464,7 @@ func (client *SchemaRegistryClient) LookupSchema(subject string, schema string, 
 
 	var codec *goavro.Codec
 	if client.getCodecCreationEnabled() && schemaType == Avro {
-		codec, err = goavro.NewCodec(schemaResp.Schema)
+		codec, err = client.getCodecForSchema(schemaResp.Schema)
 		if err != nil {
 			return nil, err
 		}
@@ -576,6 +579,13 @@ func (client *SchemaRegistryClient) SetTimeout(timeout time.Duration) {
 	client.httpClient.Timeout = timeout
 }
 
+// AddDefaultHeader allows users to add a default request
+// http headers.
+// This is useful for adding custom headers, for example apikey
+func (client *SchemaRegistryClient) AddDefaultHeader(key, value string) {
+	client.httpHeader.Add(key, value)
+}
+
 // CachingEnabled allows the client to cache any values
 // that have been returned, which may speed up performance
 // if these values rarely changes.
@@ -591,6 +601,15 @@ func (client *SchemaRegistryClient) CodecCreationEnabled(value bool) {
 	client.codecCreationEnabledLock.Lock()
 	defer client.codecCreationEnabledLock.Unlock()
 	client.codecCreationEnabled = value
+}
+
+// CodecJsonEnabled allows the application to create codec,
+// which will serialize/deserialize data as standard json.
+// Should be used with CodecCreationEnabled, otherwise it will be ignored.
+func (client *SchemaRegistryClient) CodecJsonEnabled(value bool) {
+	client.codecCreationEnabledLock.Lock()
+	defer client.codecCreationEnabledLock.Unlock()
+	client.codecAsFullJson = value
 }
 
 func (client *SchemaRegistryClient) getVersion(subject string, version string) (*Schema, error) {
@@ -617,7 +636,7 @@ func (client *SchemaRegistryClient) getVersion(subject string, version string) (
 	}
 	var codec *goavro.Codec
 	if client.getCodecCreationEnabled() {
-		codec, err = goavro.NewCodec(schemaResp.Schema)
+		codec, err = client.getCodecForSchema(schemaResp.Schema)
 		if err != nil {
 			return nil, err
 		}
@@ -656,6 +675,7 @@ func (client *SchemaRegistryClient) httpRequest(method, uri string, payload io.R
 	if err != nil {
 		return nil, err
 	}
+	req.Header = client.httpHeader
 	if client.credentials != nil {
 		if len(client.credentials.username) > 0 && len(client.credentials.password) > 0 {
 			req.SetBasicAuth(client.credentials.username, client.credentials.password)
@@ -692,6 +712,15 @@ func (client *SchemaRegistryClient) getCodecCreationEnabled() bool {
 	client.codecCreationEnabledLock.RLock()
 	defer client.codecCreationEnabledLock.RUnlock()
 	return client.codecCreationEnabled
+}
+
+func (client *SchemaRegistryClient) getCodecForSchema(schema string) (*goavro.Codec, error) {
+	client.codecCreationEnabledLock.RLock()
+	defer client.codecCreationEnabledLock.RUnlock()
+	if client.codecAsFullJson {
+		return goavro.NewCodecForStandardJSONFull(schema)
+	}
+	return goavro.NewCodec(schema)
 }
 
 // NewSchema instantiates a new Schema struct.
