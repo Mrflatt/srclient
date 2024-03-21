@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -185,7 +184,11 @@ func CreateSchemaRegistryClient(schemaRegistryURL string) *SchemaRegistryClient 
 }
 
 // CreateSchemaRegistryClientWithOptions provides the ability to pass the http.Client to be used, as well as the semaphoreWeight for concurrent requests
-func CreateSchemaRegistryClientWithOptions(schemaRegistryURL string, client *http.Client, semaphoreWeight int) *SchemaRegistryClient {
+func CreateSchemaRegistryClientWithOptions(
+	schemaRegistryURL string,
+	client *http.Client,
+	semaphoreWeight int,
+) *SchemaRegistryClient {
 	return &SchemaRegistryClient{
 		schemaRegistryURL:    schemaRegistryURL,
 		httpClient:           client,
@@ -280,7 +283,10 @@ func (client *SchemaRegistryClient) GetSchemaVersions(subject string) ([]int, er
 }
 
 // ChangeSubjectCompatibilityLevel changes the compatibility level of the subject.
-func (client *SchemaRegistryClient) ChangeSubjectCompatibilityLevel(subject string, compatibility CompatibilityLevel) (*CompatibilityLevel, error) {
+func (client *SchemaRegistryClient) ChangeSubjectCompatibilityLevel(
+	subject string,
+	compatibility CompatibilityLevel,
+) (*CompatibilityLevel, error) {
 	configChangeReq := configChangeRequest{CompatibilityLevel: compatibility}
 	configChangeReqBytes, err := json.Marshal(configChangeReq)
 	if err != nil {
@@ -320,8 +326,15 @@ func (client *SchemaRegistryClient) GetGlobalCompatibilityLevel() (*Compatibilit
 
 // GetCompatibilityLevel returns the compatibility level of the subject.
 // If defaultToGlobal is set to true and no compatibility level is set on the subject, the global compatibility level is returned.
-func (client *SchemaRegistryClient) GetCompatibilityLevel(subject string, defaultToGlobal bool) (*CompatibilityLevel, error) {
-	resp, err := client.httpRequest("GET", fmt.Sprintf(configBySubject+"?defaultToGlobal=%t", url.QueryEscape(subject), defaultToGlobal), nil)
+func (client *SchemaRegistryClient) GetCompatibilityLevel(
+	subject string,
+	defaultToGlobal bool,
+) (*CompatibilityLevel, error) {
+	resp, err := client.httpRequest(
+		"GET",
+		fmt.Sprintf(configBySubject+"?defaultToGlobal=%t", url.QueryEscape(subject), defaultToGlobal),
+		nil,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -430,7 +443,12 @@ func (client *SchemaRegistryClient) CreateSchema(subject string, schema string,
 }
 
 // LookupSchema looks up the schema by subject and schema string. If it finds the schema it returns it with all its associated information.
-func (client *SchemaRegistryClient) LookupSchema(subject string, schema string, schemaType SchemaType, references ...Reference) (*Schema, error) {
+func (client *SchemaRegistryClient) LookupSchema(
+	subject string,
+	schema string,
+	schemaType SchemaType,
+	references ...Reference,
+) (*Schema, error) {
 	switch schemaType {
 	case Avro, Json:
 		compiledRegex := regexp.MustCompile(`\r?\n`)
@@ -499,7 +517,11 @@ func (client *SchemaRegistryClient) LookupSchema(subject string, schema string, 
 
 // IsSchemaCompatible checks if the given schema is compatible with the given subject and version
 // valid versions are versionID and "latest"
-func (client *SchemaRegistryClient) IsSchemaCompatible(subject, schema, version string, schemaType SchemaType, references ...Reference) (bool, error) {
+func (client *SchemaRegistryClient) IsSchemaCompatible(
+	subject, schema, version string,
+	schemaType SchemaType,
+	references ...Reference,
+) (bool, error) {
 	if references == nil {
 		references = make([]Reference, 0)
 	}
@@ -675,7 +697,8 @@ func (client *SchemaRegistryClient) httpRequest(method, uri string, payload io.R
 	if err != nil {
 		return nil, err
 	}
-	req.Header = client.httpHeader
+
+	req.Header = client.httpHeader.Clone()
 	if client.credentials != nil {
 		if len(client.credentials.username) > 0 && len(client.credentials.password) > 0 {
 			req.SetBasicAuth(client.credentials.username, client.credentials.password)
@@ -699,7 +722,7 @@ func (client *SchemaRegistryClient) httpRequest(method, uri string, payload io.R
 		return nil, createError(resp)
 	}
 
-	return ioutil.ReadAll(resp.Body)
+	return io.ReadAll(resp.Body)
 }
 
 func (client *SchemaRegistryClient) getCachingEnabled() bool {
