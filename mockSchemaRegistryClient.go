@@ -3,11 +3,12 @@ package srclient
 import (
 	"errors"
 	"fmt"
-	"github.com/linkedin/goavro/v2"
 	"net/url"
 	"regexp"
 	"sort"
 	"time"
+
+	"github.com/linkedin/goavro/v2"
 )
 
 // Compile-time interface check
@@ -52,7 +53,12 @@ func CreateMockSchemaRegistryClient(mockURL string) *MockSchemaRegistryClient {
 var avroRegex = regexp.MustCompile(`\r?\n`)
 
 // CreateSchema generates a new schema with the given details, references are unused
-func (mck *MockSchemaRegistryClient) CreateSchema(subject string, schema string, schemaType SchemaType, _ ...Reference) (*Schema, error) {
+func (mck *MockSchemaRegistryClient) CreateSchema(
+	subject string,
+	schema string,
+	schemaType SchemaType,
+	_ ...Reference,
+) (*Schema, error) {
 	mck.idCounter++
 	return mck.SetSchema(mck.idCounter, subject, schema, schemaType, -1)
 }
@@ -60,7 +66,13 @@ func (mck *MockSchemaRegistryClient) CreateSchema(subject string, schema string,
 // SetSchema overwrites a schema with the given id. Allows you to set a schema with a specific ID for testing purposes.
 // Sets the ID counter to the given id if it is greater than the current counter. Version
 // is used to set the version of the schema. If version is -1, the version will be set to the next available version.
-func (mck *MockSchemaRegistryClient) SetSchema(id int, subject string, schema string, schemaType SchemaType, version int) (*Schema, error) {
+func (mck *MockSchemaRegistryClient) SetSchema(
+	id int,
+	subject string,
+	schema string,
+	schemaType SchemaType,
+	version int,
+) (*Schema, error) {
 	if id > mck.idCounter {
 		mck.idCounter = id
 	}
@@ -211,7 +223,15 @@ func (mck *MockSchemaRegistryClient) DeleteSubjectByVersion(subject string, vers
 }
 
 // ChangeSubjectCompatibilityLevel is not implemented
-func (mck *MockSchemaRegistryClient) ChangeSubjectCompatibilityLevel(string, CompatibilityLevel) (*CompatibilityLevel, error) {
+func (mck *MockSchemaRegistryClient) ChangeSubjectCompatibilityLevel(
+	string,
+	CompatibilityLevel,
+) (*CompatibilityLevel, error) {
+	return nil, errNotImplemented
+}
+
+// DeleteSubjectCompatibilityLevel is not implemented
+func (mck *MockSchemaRegistryClient) DeleteSubjectCompatibilityLevel(string) (*CompatibilityLevel, error) {
 	return nil, errNotImplemented
 }
 
@@ -256,7 +276,13 @@ func (mck *MockSchemaRegistryClient) CodecCreationEnabled(bool) {
 }
 
 // IsSchemaCompatible is not implemented
-func (mck *MockSchemaRegistryClient) IsSchemaCompatible(string, string, string, SchemaType, ...Reference) (bool, error) {
+func (mck *MockSchemaRegistryClient) IsSchemaCompatible(
+	string,
+	string,
+	string,
+	SchemaType,
+	...Reference,
+) (bool, error) {
 	return false, errNotImplemented
 }
 
@@ -275,7 +301,13 @@ qualify for key/value subjects, it expects to have a `concrete subject` passed o
 */
 
 // generateVersion the next version of the schema for the given subject, givenVersion can be set to -1 to generate one.
-func (mck *MockSchemaRegistryClient) generateVersion(id int, subject string, schema string, schemaType SchemaType, givenVersion int) (*Schema, error) {
+func (mck *MockSchemaRegistryClient) generateVersion(
+	id int,
+	subject string,
+	schema string,
+	schemaType SchemaType,
+	givenVersion int,
+) (*Schema, error) {
 	schemaVersionMap := map[int]*Schema{}
 	currentVersion := 1
 
